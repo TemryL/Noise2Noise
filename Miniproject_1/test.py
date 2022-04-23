@@ -23,31 +23,29 @@ def pixel_normalization(input):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Model().to(device)
-train = True
 
 # Load training set:
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../Data/train_data.pkl')
-noisy_imgs_1.to(device)
-noisy_imgs_2.to(device)
-
 noisy_imgs_1 = noisy_imgs_1.float()
 noisy_imgs_2 = noisy_imgs_2.float()
+noisy_imgs_1 = noisy_imgs_1.to(device)
+noisy_imgs_2 = noisy_imgs_2.to(device)
 
 # Load validation set:
 noisy_imgs, clean_imgs = torch.load('../Data/val_data.pkl')
-
-noisy_imgs.to(device)
-clean_imgs.to(device)
-
 noisy_imgs = noisy_imgs.float()
 clean_imgs = clean_imgs.float()
+noisy_imgs = noisy_imgs.to(device)
+clean_imgs = clean_imgs.to(device)
 
+# Normalize data:
 pixel_normalization(noisy_imgs_1)
 pixel_normalization(noisy_imgs_2)
 pixel_normalization(noisy_imgs)
 pixel_normalization(clean_imgs)
 
 # Training:
+train = True
 if train:
     model.train(noisy_imgs_1.narrow(0, 0, 1920), noisy_imgs_2.narrow(0, 0, 1920), 25)
     torch.save(model.state_dict(), 'bestmodel.pth')
