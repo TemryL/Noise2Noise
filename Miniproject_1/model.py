@@ -18,12 +18,12 @@ class Model(nn.Module):
         
         self.optimizer = optim.Adam(self.parameters(), lr = 1e-3)
         self.criterion = nn.MSELoss()
-        
+    
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.t_conv1(x))
-        x = F.relu(self.t_conv2(x))
+        x = torch.sigmoid(self.t_conv2(x))
         return x
     
     def load_pretrained_model(self):
@@ -35,7 +35,7 @@ class Model(nn.Module):
         # train_input : tensor of size (N, C, H, W) containing a noisy version of the images
         # train_target : tensor of size (N, C, H, W) containing another noisy version of the 
         # same images , which only differs from the input by their noise .
-        mini_batch_size = 32
+        mini_batch_size = 128
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
@@ -46,7 +46,7 @@ class Model(nn.Module):
                 loss.backward()
                 self.optimizer.step()
             print("Epoch {}: Loss {}".format(e, epoch_loss))
-
+    
     def predict(self, test_input):
         # test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network .
