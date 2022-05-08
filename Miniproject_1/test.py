@@ -16,8 +16,8 @@ def pixel_normalization(input):
     input.div_(255.0)
 
 if __name__ == '__main__':
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Model().to(device)
+    model = Model()
+    device = model.device
     
     # Load training set:
     noisy_imgs_1 , noisy_imgs_2 = torch.load('../Data/train_data.pkl')
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     count = 1
     denoised_imgs = []
     for noisy, clean in zip(noisy_imgs, clean_imgs):
-        denoised_imgs.append(model(noisy[None, :, :, :]))
+        denoised_imgs.append(model.predict(noisy[None, :, :, :]))
         psn_ratio += psnr(denoised_imgs[-1], clean[None, :, :, :])
     
     psn_ratio = psn_ratio/len(denoised_imgs)
