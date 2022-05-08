@@ -1,28 +1,88 @@
+from turtle import forward
 from torch import empty, cat, arange
 from torch.nn.functional import fold, unfold
 
-def Conv2d():
-    pass
+class Module(object):
+    def __init__(self):
+        pass
+    
+    def forward(self, input):
+        raise NotImplementedError
+    
+    def backward(self, gradwrtoutput):
+        raise NotImplementedError
+    
+    def param(self):
+        return []
+    
+    def __call__(self, input) :
+        return self.forward(input)
 
-def TransposeConv2d():
-    pass
-def NearestUpsampling():
-    pass
+class Conv2d(Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        # self.parameters = 
+        # self.gradient = 
+    
+    def forward(self, input):
+        pass
 
-def ReLU():
-    pass
+class TransposeConv2d(Module):
+    def __init__(self):
+        super().__init__()
 
-def Sigmoid(input):
-    return input.exp().div(input.exp()+1)
+class NearestUpsampling(Module):
+    def __init__(self):
+        super().__init__()
 
-def MSE():
-    pass
+class ReLU(Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, input):
+        return input.mul(input >= 0)
 
-def SGD():
-    pass
+class Sigmoid(Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, input):
+        return input.mul(-1).exp().add(1).pow(-1)
 
-class Sequential():
-    pass
+class MSE(Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, input, target):
+        return input.sub(target).pow(2).mean()
+    
+    def __call__(self, input, target):
+        return self.forward(input, target)
+
+class SGD(object):
+    def __init__(self, parameters, lr):
+        pass
+
+class Sequential(Module):
+    def __init__(self, *args):
+        super().__init__()
+        self.modules = []
+        for module in args:
+            self.modules.append(module)
+    
+    def forward(self, input):
+        for module in self.modules:
+            input = module(input)
+        return input
+    
+    def backward(self, gradwrtoutput):
+        for module in self.modules:
+            gradwrtoutput = module.backward(gradwrtoutput)
+        return gradwrtoutput
 
 class Model():
     def __init__(self):
