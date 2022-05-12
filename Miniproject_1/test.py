@@ -31,12 +31,6 @@ if __name__ == '__main__':
     noisy_imgs = noisy_imgs.float()
     clean_imgs = clean_imgs.float()
     
-    # Normalize data:
-    pixel_normalization(noisy_imgs_1)
-    pixel_normalization(noisy_imgs_2)
-    pixel_normalization(noisy_imgs)
-    pixel_normalization(clean_imgs)
-    
     # Training:
     train = False
     if train:

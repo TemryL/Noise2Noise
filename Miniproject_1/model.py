@@ -20,7 +20,7 @@ class Model(nn.Module):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.to(self.device)  
-        
+    
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
@@ -34,9 +34,14 @@ class Model(nn.Module):
         self.load_state_dict(m_state_dict)
     
     def train(self, train_input, train_target, num_epochs):
-        # train_input : tensor of size (N, C, H, W) containing a noisy version of the images
+        # train_input : tensor of size (N, C, H, W) containing a noisy version of the images, with values in range 0-255.
         # train_target : tensor of size (N, C, H, W) containing another noisy version of the 
-        # same images , which only differs from the input by their noise .
+        # same images , which only differs from the input by their noise, with values in range 0-255.
+        
+        # Normalize data
+        train_input = train_input.div(255.0)
+        train_target = train_target.div(255.0)
+        
         mini_batch_size = 5
         for e in range(num_epochs):
             epoch_loss = 0
@@ -50,7 +55,10 @@ class Model(nn.Module):
             print("Epoch {}: Loss {}".format(e, epoch_loss))
 
     def predict(self, test_input):
-        # test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
+        # test_input : tensor of size (N1 , C, H, W) with values in range 0-255 that has to be denoised by the trained
         # or the loaded network .
-        # returns a tensor of the size (N1 , C, H, W)
-        return self(test_input)
+        # returns a tensor of the size (N1 , C, H, W) with values in range 0-255.
+        
+        test_input = test_input.div(255.0)
+        test_output = self(test_input).mul(255.0)
+        return test_output
