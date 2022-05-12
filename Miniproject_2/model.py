@@ -19,21 +19,92 @@ class Module(object):
         return self.forward(input)
 
 class Conv2d(Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size, stride=1, bias=True):
+        
         super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.stride = stride
-        # self.parameters = 
-        # self.gradient = 
+        
+        if isinstance(in_channels, int):
+            self.in_channels = in_channels
+        else:
+            raise ValueError('Invalid input argument when instantiating Conv2d class: in_channels must be int')
+        
+        if isinstance(in_channels, int):
+            self.out_channels = out_channels
+        else:
+            raise ValueError('Invalid input argument when instantiating Conv2d class: out_channels must be int')
+        
+        if isinstance(kernel_size, int):
+            self.kernel_size = (kernel_size, kernel_size)
+        elif isinstance(kernel_size, tuple) and len(kernel_size)==2:
+            self.kernel_size = kernel_size
+        else:
+            raise ValueError('Invalid input argument when instantiating Conv2d class: kernel_size must be int or tuple of ints of size 2')
+        
+        if isinstance(stride, int):
+            self.stride = (stride, stride)
+        elif isinstance(stride, tuple) and len(stride)==2:
+            self.stride = stride
+        else:
+            raise ValueError('Invalid input argument when instantiating Conv2d class: stride must be int or tuple of ints of size 2')
+        
+        self.weight = empty(out_channels, in_channels, *self.kernel_size)
+        if bias is True:
+            self.bias = empty(out_channels)
     
     def forward(self, input):
-        pass
+        # input : tensor of size (N, C, H, W) 
+        N, C, H, W = list(input.shape)
+        K = self.kernel_size
+        S = self.stride
+        
+        unfolded = unfold(input, kernel_size=K, stride=S)
+        wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
+        output = wxb.view(N, self.out_channels , int((H-K[0])/S[0]) + 1 , int((W-K[1])/S[1]) + 1)
+        return output
 
 class TransposeConv2d(Module):
-    def __init__(self):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, bias=True):
         super().__init__()
+        
+        if isinstance(in_channels, int):
+                self.in_channels = in_channels
+        else:
+            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: in_channels must be int')
+        
+        if isinstance(in_channels, int):
+            self.out_channels = out_channels
+        else:
+            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: out_channels must be int')
+        
+        if isinstance(kernel_size, int):
+            self.kernel_size = (kernel_size, kernel_size)
+        elif isinstance(kernel_size, tuple) and len(kernel_size)==2:
+            self.kernel_size = kernel_size
+        else:
+            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: kernel_size must be int or tuple of ints of size 2')
+        
+        if isinstance(stride, int):
+            self.stride = (stride, stride)
+        elif isinstance(stride, tuple) and len(stride)==2:
+            self.stride = stride
+        else:
+            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: stride must be int or tuple of ints of size 2')
+        
+        self.weight = empty(out_channels, in_channels, *self.kernel_size)
+        if bias is True:
+            self.bias = empty(out_channels)
+    
+    # def forward(self, input):
+    #     # input : tensor of size (N, C, H, W) 
+    #     N, C, H, W = list(input.shape)
+    #     K = self.kernel_size
+    #     S = self.stride
+        
+    #     unfolded = unfold(input, kernel_size=K, stride=S, padding=(H-K[0], W-K[1]))
+    #     wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
+    #     output = wxb.view(N, self.out_channels , S[0]*(H-1) + K[0], S[1]*(W-1) + K[1])
+    #     return output
+
 
 class NearestUpsampling(Module):
     def __init__(self):
@@ -94,13 +165,13 @@ class Model():
         pass
     
     def train(self, train_input, train_target):
-        # train_input : tensor of size (N, C, H, W) containing a noisy version of the images
+        # train_input : tensor of size (N, C, H, W) containing a noisy version of the images with values in range 0-255.
         # train_target : tensor of size (N, C, H, W) containing another noisy version of the
-        # same images , which only differs from the input by their noise .
+        # same images , which only differs from the input by their noise, with values in range 0-255.
         pass
     
     def predict(self, test_input):
         # test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
-        # or the loaded network .
-        # returns a tensor of the size (N1 , C, H, W)
+        # or the loaded network, with values in range 0-255.
+        # returns a tensor of the size (N1 , C, H, W) with values in range 0-255.
         pass
