@@ -106,9 +106,9 @@ class TransposeConv2d(Module):
     #     return output
 
 
-class NearestUpsampling(Module):
-    def __init__(self):
-        super().__init__()
+# class NearestUpsampling(Module):
+#     def __init__(self):
+#         super().__init__()
 
 class ReLU(Module):
     def __init__(self):
