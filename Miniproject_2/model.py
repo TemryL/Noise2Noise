@@ -2,6 +2,12 @@ from turtle import forward
 from torch import empty, cat, arange
 from torch.nn.functional import fold, unfold
 
+def padd(input, padd_size):
+    pass
+
+def dilate():
+    pass
+
 class Module(object):
     def __init__(self):
         pass
@@ -47,7 +53,7 @@ class Conv2d(Module):
         else:
             raise ValueError('Invalid input argument when instantiating Conv2d class: stride must be int or tuple of ints of size 2')
         
-        self.weight = empty(out_channels, in_channels, *self.kernel_size)
+        self.x = empty(out_channels, in_channels, *self.kernel_size)
         if bias is True:
             self.bias = empty(out_channels)
     
@@ -61,6 +67,9 @@ class Conv2d(Module):
         wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
         output = wxb.view(N, self.out_channels , int((H-K[0])/S[0]) + 1 , int((W-K[1])/S[1]) + 1)
         return output
+    
+    def param(self):
+        return [(self.weight, self.weight.grad), (self.bias, self.bias.grad)]
 
 class TransposeConv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, bias=True):
@@ -150,10 +159,10 @@ class Sequential(Module):
             input = module(input)
         return input
     
-    def backward(self, gradwrtoutput):
-        for module in self.modules:
-            gradwrtoutput = module.backward(gradwrtoutput)
-        return gradwrtoutput
+    # def backward(self, gradwrtoutput):
+    #     for module in self.modules:
+    #         gradwrtoutput = module.backward(gradwrtoutput)
+    #     return gradwrtoutput
 
 class Model():
     def __init__(self):
