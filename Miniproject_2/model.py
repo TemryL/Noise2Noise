@@ -7,7 +7,6 @@ def padd(input, padd_size):
 
 def dilate():
     pass
-
 class Module(object):
     def __init__(self):
         pass
@@ -70,22 +69,37 @@ class Conv2d(Module):
         self.x = empty(out_channels, in_channels, *self.kernel_size)
         if bias is True:
             self.bias = empty(out_channels)
+        
+        self.input = None
     
     def forward(self, input):
         # input : tensor of size (N, C, H, W) 
-        N, C, H, W = list(input.shape)
-        K = self.kernel_size
-        S = self.stride
-        D = self.dilation
-        P = self.padding
+        self.input = input
         
-        unfolded = unfold(input, kernel_size=K, dilation=D, padding=P, stride=S)
-        wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
-        output = wxb.view(N, self.out_channels , int((H+2*P[0]-D[0]*(K[0]-1)-1)/S[0] + 1) , int((W+2*P[1]-D[1]*(K[1]-1)-1)/S[1] + 1))
-        return output
+        return self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
+    
+    def backward(self, gradwrtoutput):
+        # Gradient of the loss wrt the weights
+        dw = self._convolve(self.input, self.out_channels, gradwrtoutput, dilation=(self.stride[0], self.stride[1]))
+        
+        db = # Gradient of the loss wrt the bias
+        dx = # Gradient of the loss wrt the module's input
+        return
     
     def param(self):
         return [(self.weight, self.weight.grad), (self.bias, self.bias.grad)]
+    
+    def _convolve(self, input, out_channels, weight, bias=0, stride=1, dilation=1, padding=0):
+        N, C, H, W = list(input.shape)
+        K = (weight.shape[-2], weight.shape[-1])
+        S = stride
+        D = dilation
+        P = padding
+        
+        unfolded = unfold(input, kernel_size=K, dilation=D, padding=P, stride=S)
+        kxb = weight.view(out_channels, -1).matmul(unfolded) + bias.view(1, -1, 1)
+        output = kxb.view(N, out_channels , int((H+2*P[0]-D[0]*(K[0]-1)-1)/S[0] + 1) , int((W+2*P[1]-D[1]*(K[1]-1)-1)/S[1] + 1))
+        return output
 
 class TransposeConv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, bias=True):

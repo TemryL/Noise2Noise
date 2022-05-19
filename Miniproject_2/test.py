@@ -16,6 +16,7 @@ if __name__ == "__main__":
     conv2 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padd, dilation=dil)
     
     conv1.weight = conv2.weight.data
+    print(conv1.weight.shape)
     conv1.bias = conv2.bias.data
     
     batch_size = 3
