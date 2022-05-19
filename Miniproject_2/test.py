@@ -9,10 +9,12 @@ if __name__ == "__main__":
     out_channels = 4
     kernel_size = (3, 3)
     stride = (2,6)
+    padd = (2, 3)
+    dil = (2,4)
     
-    conv1 = Conv2d(in_channels, out_channels, kernel_size, stride)
-    conv2 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride)
-
+    conv1 = Conv2d(in_channels, out_channels, kernel_size, stride, padding=padd, dilation=dil)
+    conv2 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padd, dilation=dil)
+    
     conv1.weight = conv2.weight.data
     conv1.bias = conv2.bias.data
     

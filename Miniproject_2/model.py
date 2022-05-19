@@ -25,7 +25,7 @@ class Module(object):
         return self.forward(input)
 
 class Conv2d(Module):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size, stride=1, bias=True):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size, stride=1, padding=0, dilation=1, bias=True):
         
         super().__init__()
         
@@ -53,6 +53,20 @@ class Conv2d(Module):
         else:
             raise ValueError('Invalid input argument when instantiating Conv2d class: stride must be int or tuple of ints of size 2')
         
+        if isinstance(padding, int):
+            self.padding = (padding, padding)
+        elif isinstance(padding, tuple) and len(padding)==2:
+            self.padding = padding
+        else:
+            raise ValueError('Invalid input argument when instantiating Conv2d class: padding must be int or tuple of ints of size 2')
+        
+        if isinstance(dilation, int):
+            self.dilation = (dilation, dilation)
+        elif isinstance(dilation, tuple) and len(dilation)==2:
+            self.dilation = dilation
+        else:
+            raise ValueError('Invalid input argument when instantiating Conv2d class: dilation must be int or tuple of ints of size 2')
+        
         self.x = empty(out_channels, in_channels, *self.kernel_size)
         if bias is True:
             self.bias = empty(out_channels)
@@ -62,10 +76,12 @@ class Conv2d(Module):
         N, C, H, W = list(input.shape)
         K = self.kernel_size
         S = self.stride
+        D = self.dilation
+        P = self.padding
         
-        unfolded = unfold(input, kernel_size=K, stride=S)
+        unfolded = unfold(input, kernel_size=K, dilation=D, padding=P, stride=S)
         wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
-        output = wxb.view(N, self.out_channels , int((H-K[0])/S[0]) + 1 , int((W-K[1])/S[1]) + 1)
+        output = wxb.view(N, self.out_channels , int((H+2*P[0]-D[0]*(K[0]-1)-1)/S[0] + 1) , int((W+2*P[1]-D[1]*(K[1]-1)-1)/S[1] + 1))
         return output
     
     def param(self):
