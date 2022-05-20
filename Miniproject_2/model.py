@@ -33,38 +33,15 @@ class Conv2d(Module):
         else:
             raise ValueError('Invalid input argument when instantiating Conv2d class: in_channels must be int')
         
-        if isinstance(in_channels, int):
+        if isinstance(out_channels, int):
             self.out_channels = out_channels
         else:
             raise ValueError('Invalid input argument when instantiating Conv2d class: out_channels must be int')
         
-        if isinstance(kernel_size, int):
-            self.kernel_size = (kernel_size, kernel_size)
-        elif isinstance(kernel_size, tuple) and len(kernel_size)==2:
-            self.kernel_size = kernel_size
-        else:
-            raise ValueError('Invalid input argument when instantiating Conv2d class: kernel_size must be int or tuple of ints of size 2')
-        
-        if isinstance(stride, int):
-            self.stride = (stride, stride)
-        elif isinstance(stride, tuple) and len(stride)==2:
-            self.stride = stride
-        else:
-            raise ValueError('Invalid input argument when instantiating Conv2d class: stride must be int or tuple of ints of size 2')
-        
-        if isinstance(padding, int):
-            self.padding = (padding, padding)
-        elif isinstance(padding, tuple) and len(padding)==2:
-            self.padding = padding
-        else:
-            raise ValueError('Invalid input argument when instantiating Conv2d class: padding must be int or tuple of ints of size 2')
-        
-        if isinstance(dilation, int):
-            self.dilation = (dilation, dilation)
-        elif isinstance(dilation, tuple) and len(dilation)==2:
-            self.dilation = dilation
-        else:
-            raise ValueError('Invalid input argument when instantiating Conv2d class: dilation must be int or tuple of ints of size 2')
+        self.kernel_size = self._check_argmument(kernel_size, "kernel_size")
+        self.stride = self._check_argmument(stride, "stride")
+        self.padding = self._check_argmument(padding, "padding")
+        self.dilation = self._check_argmument(dilation, "dilation")
         
         self.x = empty(out_channels, in_channels, *self.kernel_size)
         if bias is True:
@@ -78,28 +55,44 @@ class Conv2d(Module):
         
         return self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
     
-    def backward(self, gradwrtoutput):
-        # Gradient of the loss wrt the weights
-        dw = self._convolve(self.input, self.out_channels, gradwrtoutput, dilation=(self.stride[0], self.stride[1]))
+    # def backward(self, gradwrtoutput):
+    #     # Gradient of the loss wrt the weights
+    #     dw = self._convolve(self.input, self.out_channels, gradwrtoutput, dilation=(self.stride[0], self.stride[1]))
         
-        db = # Gradient of the loss wrt the bias
-        dx = # Gradient of the loss wrt the module's input
-        return
+    #     # Gradient of the loss wrt the bias
+    #     db = gradwrtoutput.sum((0,2,3))
+        
+    #     # Gradient of the loss wrt the module's input
+    #     flip_weight = 
+    #     dx = 
+    #     return
     
     def param(self):
         return [(self.weight, self.weight.grad), (self.bias, self.bias.grad)]
     
-    def _convolve(self, input, out_channels, weight, bias=0, stride=1, dilation=1, padding=0):
+    def _convolve(self, input, out_channels, weight, bias=None, stride=1, dilation=1, padding=0):
         N, C, H, W = list(input.shape)
         K = (weight.shape[-2], weight.shape[-1])
-        S = stride
-        D = dilation
-        P = padding
+        S = self._check_argmument(stride)
+        D = self._check_argmument(dilation)
+        P = self._check_argmument(padding)
         
         unfolded = unfold(input, kernel_size=K, dilation=D, padding=P, stride=S)
-        kxb = weight.view(out_channels, -1).matmul(unfolded) + bias.view(1, -1, 1)
+        if bias is None:
+            kxb = weight.view(out_channels, -1).matmul(unfolded)
+        else:
+            kxb = weight.view(out_channels, -1).matmul(unfolded) + bias.view(1, -1, 1)
         output = kxb.view(N, out_channels , int((H+2*P[0]-D[0]*(K[0]-1)-1)/S[0] + 1) , int((W+2*P[1]-D[1]*(K[1]-1)-1)/S[1] + 1))
         return output
+    
+    def _check_argmument(self, arg, name=""):
+        if isinstance(arg, int):
+            arg = (arg, arg)
+        
+        elif not(isinstance(arg, tuple) and len(arg)==2):
+            raise ValueError("Invalid input argument when instantiating Conv2d class: {} must be int or tuple of ints of size 2".format(name))
+        
+        return arg
 
 class TransposeConv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, bias=True):

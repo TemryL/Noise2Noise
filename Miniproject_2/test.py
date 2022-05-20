@@ -7,7 +7,7 @@ if __name__ == "__main__":
     
     in_channels = 3
     out_channels = 4
-    kernel_size = (3, 3)
+    kernel_size = (3,3)
     stride = (2,6)
     padd = (2, 3)
     dil = (2,4)
@@ -16,16 +16,22 @@ if __name__ == "__main__":
     conv2 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padd, dilation=dil)
     
     conv1.weight = conv2.weight.data
-    print(conv1.weight.shape)
     conv1.bias = conv2.bias.data
     
-    batch_size = 3
+    batch_size = 7
     x = torch.randn((batch_size, in_channels, 32, 32))
     
-    # Output of PyTorch convolution
-    expected = conv2(x)
+    kernel = torch.randn(out_channels, in_channels, 3, 3)
     
-    # Output of convolution as a matrix product
-    actual = conv1(x)
+    x1 = conv1._convolve(x, out_channels, kernel)
+    x2 = conv1._convolve(kernel, out_channels, x)
     
-    torch.testing.assert_allclose(actual, expected)
+    torch.testing.assert_allclose(x1, x2)
+    
+    # # Output of PyTorch convolution
+    # expected = conv2(x)
+    
+    # # Output of convolution as a matrix product
+    # actual = conv1(x)
+    
+    # torch.testing.assert_allclose(actual, expected)
