@@ -16,6 +16,9 @@ class Module(object):
     
     def __call__(self, input) :
         return self.forward(input)
+    
+    def __repr__(self):
+        return "{}".format(self.__class__.__name__)
 
 class Conv2d(Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size, stride=1, padding=0, dilation=1, bias=True):
@@ -119,6 +122,14 @@ class Conv2d(Module):
                 raise ValueError("Invalid argument when calling internal function: check kernel_size, padding, stride or dilation")
         
         return arg
+    
+    def __repr__(self):
+        if self.bias is not None:
+            bias = True
+        else:
+            bias = False
+        return "Conv2d(in_channels={}, out_channels={}, kernel_size={}, stride={}, padding={}, dilation={}, bias={})".format(
+            self.in_channels, self.out_channels, self.kernel_size, self.stride, self.padding, self.dilation, bias)
 
 # class TransposeConv2d(Module):
 #     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
@@ -230,10 +241,16 @@ class Sequential(Module):
             input = module(input)
         return input
     
-    # def backward(self, gradwrtoutput):
-    #     for module in self.modules:
-    #         gradwrtoutput = module.backward(gradwrtoutput)
-    #     return gradwrtoutput
+    def backward(self, gradwrtoutput):
+        for module in self.modules:
+            gradwrtoutput = module.backward(gradwrtoutput)
+        return gradwrtoutput
+    
+    def __repr__(self):
+        name = ""
+        for module in self.modules:
+            name += "   " + module.__repr__() + "\n"
+        return "Sequential(\n{})".format(name)
 
 class Model():
     def __init__(self):
@@ -254,4 +271,7 @@ class Model():
         # test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained
         # or the loaded network, with values in range 0-255.
         # returns a tensor of the size (N1 , C, H, W) with values in range 0-255.
+        pass
+    
+    def __repr__(self):
         pass
