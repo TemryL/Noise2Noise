@@ -1,12 +1,6 @@
-from turtle import forward
 from torch import empty, cat, arange
 from torch.nn.functional import fold, unfold
 
-def padd(input, padd_size):
-    pass
-
-def dilate():
-    pass
 class Module(object):
     def __init__(self):
         pass
@@ -38,34 +32,42 @@ class Conv2d(Module):
         else:
             raise ValueError('Invalid input argument when instantiating Conv2d class: out_channels must be int')
         
-        self.kernel_size = self._check_argmument(kernel_size, "kernel_size")
-        self.stride = self._check_argmument(stride, "stride")
-        self.padding = self._check_argmument(padding, "padding")
-        self.dilation = self._check_argmument(dilation, "dilation")
+        self.kernel_size = self._check_argument(kernel_size, "kernel_size")
+        self.stride = self._check_argument(stride, "stride")
+        self.padding = self._check_argument(padding, "padding")
+        self.dilation = self._check_argument(dilation, "dilation")
         
-        self.x = empty(out_channels, in_channels, *self.kernel_size)
+        self.weight = empty(out_channels, in_channels, *self.kernel_size)
+        self.weight.grad = empty(out_channels, in_channels, *self.kernel_size).mul(0.0)
+        
         if bias is True:
             self.bias = empty(out_channels)
+            self.bias = empty(out_channels).mul(0.0)
         
         self.input = None
     
     def forward(self, input):
         # input : tensor of size (N, C, H, W) 
         self.input = input
-        
         return self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
     
-    # def backward(self, gradwrtoutput):
-    #     # Gradient of the loss wrt the weights
-    #     dw = self._convolve(self.input, self.out_channels, gradwrtoutput, dilation=(self.stride[0], self.stride[1]))
+    def backward(self, gradwrtoutput):
+        # Gradient of the loss wrt the weights
+        dw = self._convolve(self.input, self.out_channels, gradwrtoutput, dilation=(self.stride[0], self.stride[1]))
+        self.weight.grad += dw
         
-    #     # Gradient of the loss wrt the bias
-    #     db = gradwrtoutput.sum((0,2,3))
+        # Gradient of the loss wrt the bias
+        db = gradwrtoutput.sum((0,2,3))
+        self.bias.grad += db
         
-    #     # Gradient of the loss wrt the module's input
-    #     flip_weight = 
-    #     dx = 
-    #     return
+        # Gradient of the loss wrt the module's input
+        S = self.stride
+        W, H = self.weight.shape[-2], self.weight.shape[-1]
+        flip_weight = self._rot90(self._rot90(self.weight))
+        dilated_output = self._dilate(gradwrtoutput, dilation=(S[0]-1, S[1]-1))
+        dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(W-1, H-1))
+        
+        return dx
     
     def param(self):
         return [(self.weight, self.weight.grad), (self.bias, self.bias.grad)]
@@ -73,9 +75,9 @@ class Conv2d(Module):
     def _convolve(self, input, out_channels, weight, bias=None, stride=1, dilation=1, padding=0):
         N, C, H, W = list(input.shape)
         K = (weight.shape[-2], weight.shape[-1])
-        S = self._check_argmument(stride)
-        D = self._check_argmument(dilation)
-        P = self._check_argmument(padding)
+        S = self._check_argument(stride)
+        D = self._check_argument(dilation)
+        P = self._check_argument(padding)
         
         unfolded = unfold(input, kernel_size=K, dilation=D, padding=P, stride=S)
         if bias is None:
@@ -85,58 +87,83 @@ class Conv2d(Module):
         output = kxb.view(N, out_channels , int((H+2*P[0]-D[0]*(K[0]-1)-1)/S[0] + 1) , int((W+2*P[1]-D[1]*(K[1]-1)-1)/S[1] + 1))
         return output
     
-    def _check_argmument(self, arg, name=""):
+    def _padd(self, input, padding):
+        N, C, H, W = list(input.shape)
+        P = self._check_argument(padding)
+        padded = unfold(input, kernel_size = 1, padding = P)
+        padded = fold(padded, output_size = (H+2*P[0],W+2*P[1]), kernel_size = 1)
+        return padded
+    
+    def _dilate(self, input, dilation):
+        N, C, H, W = list(input.shape)
+        D = self._check_argument(dilation)
+        dilated = empty(N ,C, H + (H-1)*(D[0]-1), W + (W-1)*(D[1]-1)).mul(0.0)
+        dilated[:,:,::D[0],::D[1]] = input
+        return dilated
+    
+    def _rot90(self, input):
+        input = input.transpose(-1,-2)
+        rot = empty(input.shape)
+        for i in range(input.shape[-2]):
+            rot[:,:,i,:] = input[:,:,-i-1,:]
+        return rot
+    
+    def _check_argument(self, arg, name=""):
         if isinstance(arg, int):
             arg = (arg, arg)
         
         elif not(isinstance(arg, tuple) and len(arg)==2):
-            raise ValueError("Invalid input argument when instantiating Conv2d class: {} must be int or tuple of ints of size 2".format(name))
+            if name != "":
+                raise ValueError("Invalid input argument when instantiating Conv2d class: {} must be int or tuple of ints of size 2".format(name))
+            else:
+                raise ValueError("Invalid argument when calling internal function: check kernel_size, padding, stride or dilation")
         
         return arg
 
-class TransposeConv2d(Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, bias=True):
-        super().__init__()
+# class TransposeConv2d(Module):
+#     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
+#         super().__init__()
         
-        if isinstance(in_channels, int):
-                self.in_channels = in_channels
-        else:
-            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: in_channels must be int')
+#         if isinstance(in_channels, int):
+#                 self.in_channels = in_channels
+#         else:
+#             raise ValueError('Invalid input argument when instantiating TransposeConv2d class: in_channels must be int')
         
-        if isinstance(in_channels, int):
-            self.out_channels = out_channels
-        else:
-            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: out_channels must be int')
+#         if isinstance(in_channels, int):
+#             self.out_channels = out_channels
+#         else:
+#             raise ValueError('Invalid input argument when instantiating TransposeConv2d class: out_channels must be int')
         
-        if isinstance(kernel_size, int):
-            self.kernel_size = (kernel_size, kernel_size)
-        elif isinstance(kernel_size, tuple) and len(kernel_size)==2:
-            self.kernel_size = kernel_size
-        else:
-            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: kernel_size must be int or tuple of ints of size 2')
+#         self.kernel_size = self._check_argument(kernel_size, "kernel_size")
+#         self.stride = self._check_argument(stride, "stride")
+#         self.padding = self._check_argument(padding, "padding")
+#         self.dilation = self._check_argument(dilation, "dilation")
         
-        if isinstance(stride, int):
-            self.stride = (stride, stride)
-        elif isinstance(stride, tuple) and len(stride)==2:
-            self.stride = stride
-        else:
-            raise ValueError('Invalid input argument when instantiating TransposeConv2d class: stride must be int or tuple of ints of size 2')
+#         self.x = empty(out_channels, in_channels, *self.kernel_size)
+#         if bias is True:
+#             self.bias = empty(out_channels)
         
-        self.weight = empty(out_channels, in_channels, *self.kernel_size)
-        if bias is True:
-            self.bias = empty(out_channels)
+#         self.input = None
+        
+#     def forward(self, input):
+#         # input : tensor of size (N, C, H, W) 
+#         N, C, H, W = list(input.shape)
+#         K = self.kernel_size
+#         S = self.stride
+        
+#         unfolded = unfold(input, kernel_size=K, stride=S, padding=(H-K[0], W-K[1]))
+#         wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
+#         output = wxb.view(N, self.out_channels , S[0]*(H-1) + K[0], S[1]*(W-1) + K[1])
+#         return output
     
-    # def forward(self, input):
-    #     # input : tensor of size (N, C, H, W) 
-    #     N, C, H, W = list(input.shape)
-    #     K = self.kernel_size
-    #     S = self.stride
+#     def _check_argument(self, arg, name=""):
+#         if isinstance(arg, int):
+#             arg = (arg, arg)
         
-    #     unfolded = unfold(input, kernel_size=K, stride=S, padding=(H-K[0], W-K[1]))
-    #     wxb = self.weight.view(self.out_channels, -1).matmul(unfolded) + self.bias.view(1, -1, 1)
-    #     output = wxb.view(N, self.out_channels , S[0]*(H-1) + K[0], S[1]*(W-1) + K[1])
-    #     return output
-
+#         elif not(isinstance(arg, tuple) and len(arg)==2):
+#             raise ValueError("Invalid input argument when instantiating TransposeConv2d class: {} must be int or tuple of ints of size 2".format(name))
+        
+#         return arg
 
 # class NearestUpsampling(Module):
 #     def __init__(self):
@@ -145,16 +172,37 @@ class TransposeConv2d(Module):
 class ReLU(Module):
     def __init__(self):
         super().__init__()
+        self.input = None
     
     def forward(self, input):
+        self.input = input
         return input.mul(input >= 0)
+    
+    def backward(self, gradwrtoutput):
+        # Gradient of the loss wrt the module's input
+        return gradwrtoutput.mul(self._dReLU(self.input))
+    
+    def _dReLU(self, input):
+        output = empty(input.shape)
+        output[input>0] = 1
+        output[input<=0] = 0
+        return output
 
 class Sigmoid(Module):
     def __init__(self):
         super().__init__()
+        self.input = None
     
     def forward(self, input):
+        self.input = input
         return input.mul(-1).exp().add(1).pow(-1)
+    
+    def backward(self, gradwrtoutput):
+        # Gradient of the loss wrt the module's input
+        return gradwrtoutput.mul(self._dSigmoid(self.input))
+    
+    def _dSigmoid(self, input):
+        return input.mul(-1).exp().div(input.mul(-1).exp().add(1).pow(2))
 
 class MSE(Module):
     def __init__(self):

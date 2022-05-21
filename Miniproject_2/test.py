@@ -21,17 +21,10 @@ if __name__ == "__main__":
     batch_size = 7
     x = torch.randn((batch_size, in_channels, 32, 32))
     
-    kernel = torch.randn(out_channels, in_channels, 3, 3)
+    # Output of PyTorch convolution
+    expected = conv2(x)
     
-    x1 = conv1._convolve(x, out_channels, kernel)
-    x2 = conv1._convolve(kernel, out_channels, x)
+    # Output of convolution as a matrix product
+    actual = conv1(x)
     
-    torch.testing.assert_allclose(x1, x2)
-    
-    # # Output of PyTorch convolution
-    # expected = conv2(x)
-    
-    # # Output of convolution as a matrix product
-    # actual = conv1(x)
-    
-    # torch.testing.assert_allclose(actual, expected)
+    torch.testing.assert_allclose(actual, expected)
