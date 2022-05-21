@@ -56,7 +56,15 @@ class Conv2d(Module):
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the weights
-        dw = self._convolve(self.input, self.out_channels, gradwrtoutput, dilation=(self.stride[0], self.stride[1]))
+        dw = empty(self.weight.shape)
+        
+        for b in range(self.input.shape[0]):
+            test_in = self.input[b:b+1,:,:,:]
+            test_out = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
+        
+            for i in range(self.input.shape[1]):
+                dw[:,i:i+1,:,:] += self._convolve(test_in[:,i:i+1,:,:], self.out_channels, test_out, padding=self.padding, stride=self.dilation, dilation=self.stride).permute(1,0,2,3)
+        
         self.weight.grad += dw
         
         # Gradient of the loss wrt the bias
@@ -64,12 +72,11 @@ class Conv2d(Module):
         self.bias.grad += db
         
         # Gradient of the loss wrt the module's input
-        S = self.stride
-        W, H = self.weight.shape[-2], self.weight.shape[-1]
+        H, W = self.weight.shape[-2], self.weight.shape[-1]
         flip_weight = self._rot90(self._rot90(self.weight))
-        dilated_output = self._dilate(gradwrtoutput, dilation=(S[0]-1, S[1]-1))
-        dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(W-1, H-1))
-        
+        dilated_output = self._dilate(gradwrtoutput, dilation=self.stride)
+        dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(H-1, W-1))
+        print(dx.shape)
         return dx
     
     def param(self):
@@ -191,6 +198,8 @@ class ReLU(Module):
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the module's input
+        print(gradwrtoutput.shape)
+        print(self.input.shape)
         return gradwrtoutput.mul(self._dReLU(self.input))
     
     def _dReLU(self, input):
@@ -220,14 +229,29 @@ class MSE(Module):
         super().__init__()
     
     def forward(self, input, target):
+        self.input = input
+        self.target = target
         return input.sub(target).pow(2).mean()
+    
+    def backward(self):
+        return self.input.sub(self.target).mul(2).div(self.input.numel())
     
     def __call__(self, input, target):
         return self.forward(input, target)
 
 class SGD(object):
     def __init__(self, parameters, lr):
-        pass
+        # parameters: list of pairs (2-tuple) of parameters returned by param() function from class Module
+        self.params = parameters
+        self.lr = lr
+    
+    def zero_grad(self):
+        for param in self.params:
+            param[1].mul_(0.0)
+    
+    def step(self):
+        for param in self.params:
+            param[0].add_(param[1].mul(-self.lr))
 
 class Sequential(Module):
     def __init__(self, *args):
@@ -242,9 +266,15 @@ class Sequential(Module):
         return input
     
     def backward(self, gradwrtoutput):
-        for module in self.modules:
+        for module in reversed(self.modules):
             gradwrtoutput = module.backward(gradwrtoutput)
         return gradwrtoutput
+    
+    def param(self):
+        param = []
+        for module in self.modules:
+            param.extend(module.param())
+        return param
     
     def __repr__(self):
         name = ""
