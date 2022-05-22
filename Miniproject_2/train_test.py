@@ -17,14 +17,14 @@ def pixel_normalization(input):
 
 if __name__ == '__main__':
     model = Model()
-    device = model.device
+    #device = model.device
     
     # Load training set:
     noisy_imgs_1 , noisy_imgs_2 = torch.load('../Data/train_data.pkl')
     noisy_imgs_1 = noisy_imgs_1.float()
     noisy_imgs_2 = noisy_imgs_2.float()
-    noisy_imgs_1 = noisy_imgs_1.to(device)
-    noisy_imgs_2 = noisy_imgs_2.to(device)
+    # noisy_imgs_1 = noisy_imgs_1.to(device)
+    # noisy_imgs_2 = noisy_imgs_2.to(device)
     
     # Load validation set:
     noisy_imgs, clean_imgs = torch.load('../Data/val_data.pkl')
@@ -34,12 +34,12 @@ if __name__ == '__main__':
     # Training:
     train = True
     if train:
-        model.train(noisy_imgs_1.narrow(0, 0, 992), noisy_imgs_2.narrow(0, 0, 992), 10)
-        torch.save(model.state_dict(), 'bestmodel.pth')
+        model.train(noisy_imgs_1.narrow(0, 0, 10), noisy_imgs_2.narrow(0, 0, 10), 2)
+        #torch.save(model.state_dict(), 'bestmodel.pth')
     
     # Validation:
-    model = model.to('cpu')
-    model.load_pretrained_model()
+    # model = model.to('cpu')
+    # model.load_pretrained_model()
     
     psn_ratio = 0
     count = 1
@@ -76,4 +76,3 @@ if __name__ == '__main__':
         plt.imshow(np.transpose(clean.squeeze(), (1, 2, 0)), cmap="gray")
     
     plt.show()
-

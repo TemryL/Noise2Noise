@@ -23,7 +23,7 @@ if __name__ == "__main__":
     target = torch.randn((batch_size, 3, 28, 28))
     
     net = Net()
-    
+    print(net(input).shape)
     conv1 = Conv2d(3, 4, kernel_size=3, stride=1, padding=0, dilation=1)
     conv2 = Conv2d(4, 3, kernel_size=3, stride=1, padding=0, dilation=1)
     
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     loss.backward()
     optimizer.step()
     
-    expected = net.conv2.bias.data
+    expected = net.conv2.weight.data
     
     ###############################################
     
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     seq.backward(criterion.backward())
     optimizer.step()
     
-    actual = seq.modules[2].bias
+    actual = seq.modules[2].weight
     ###############################################
     
     # in2 = seq(input)

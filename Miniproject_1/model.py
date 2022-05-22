@@ -42,7 +42,7 @@ class Model(nn.Module):
         train_input = train_input.div(255.0)
         train_target = train_target.div(255.0)
         
-        mini_batch_size = 5
+        mini_batch_size = 32
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
@@ -53,7 +53,7 @@ class Model(nn.Module):
                 loss.backward()
                 self.optimizer.step()
             print("Epoch {}: Loss {}".format(e, epoch_loss))
-
+    
     def predict(self, test_input):
         # test_input : tensor of size (N1 , C, H, W) with values in range 0-255 that has to be denoised by the trained
         # or the loaded network .
