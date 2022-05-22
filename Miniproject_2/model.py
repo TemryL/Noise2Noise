@@ -270,14 +270,14 @@ class Sequential(Module):
 class Model(object):
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
-        self.model = Sequential(Conv2d(3, 32, kernel_size=3, stride=1), 
+        self.model = Sequential(Conv2d(3, 3, kernel_size=3, stride=1), 
                                 ReLU(),
-                                Conv2d(32, 32, kernel_size=3, stride=1),
+                                Conv2d(3, 3, kernel_size=3, stride=1),
                                 ReLU(),
-                                TransposeConv2d(32, 32, kernel_size=3, stride=1),
+                                TransposeConv2d(3, 3, kernel_size=3, stride=1),
                                 ReLU(),
-                                TransposeConv2d(32, 3, kernel_size=3, stride=1),
-                                ReLU())
+                                TransposeConv2d(3, 3, kernel_size=3, stride=1),
+                                Sigmoid())
         
         self.optimizer = SGD(self.model.param(), lr=1e-3)
         self.criterion = MSE()
@@ -295,10 +295,11 @@ class Model(object):
         train_input = train_input.div(255.0)
         train_target = train_target.div(255.0)
         
-        mini_batch_size = 1
+        mini_batch_size = 1000
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
+                print(b)
                 output = self.model(train_input.narrow(0, b, mini_batch_size))
                 loss = self.criterion(output, train_target.narrow(0, b, mini_batch_size))
                 epoch_loss += loss
