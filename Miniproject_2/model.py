@@ -1,6 +1,6 @@
 from torch import empty, cat, arange
 from torch.nn.functional import fold, unfold
-
+import torch
 class Module(object):
     def __init__(self):
         pass
@@ -40,11 +40,11 @@ class Conv2d(Module):
         self.padding = self._check_argument(padding, "padding")
         self.dilation = self._check_argument(dilation, "dilation")
         
-        self.weight = empty(out_channels, in_channels, *self.kernel_size)
+        self.weight = empty(out_channels, in_channels, *self.kernel_size).uniform_(-1,1)
         self.weight.grad = empty(out_channels, in_channels, *self.kernel_size).mul(0.0)
         
         if bias is True:
-            self.bias = empty(out_channels)
+            self.bias = empty(out_channels).uniform_(-1,1)
             self.bias = empty(out_channels).mul(0.0)
         
         self.input = None
@@ -56,14 +56,12 @@ class Conv2d(Module):
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the weights
-        dw = empty(self.weight.shape)
+        dw = empty(self.weight.shape).mul(0.0)
         
         for b in range(self.input.shape[0]):
-            test_in = self.input[b:b+1,:,:,:]
-            test_out = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
-        
+            permuted_output = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
             for i in range(self.input.shape[1]):
-                dw[:,i:i+1,:,:] += self._convolve(test_in[:,i:i+1,:,:], self.out_channels, test_out, padding=self.padding, stride=self.dilation, dilation=self.stride).permute(1,0,2,3)
+                dw[:,i:i+1,:,:] += self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted_output, padding=self.padding, stride=self.dilation, dilation=self.stride).permute(1,0,2,3)
         
         self.weight.grad += dw
         
@@ -71,13 +69,13 @@ class Conv2d(Module):
         db = gradwrtoutput.sum((0,2,3))
         self.bias.grad += db
         
-        # Gradient of the loss wrt the module's input
-        H, W = self.weight.shape[-2], self.weight.shape[-1]
-        flip_weight = self._rot90(self._rot90(self.weight))
-        dilated_output = self._dilate(gradwrtoutput, dilation=self.stride)
-        dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(H-1, W-1))
-        print(dx.shape)
-        return dx
+        # # Gradient of the loss wrt the module's input
+        # H, W = self.weight.shape[-2], self.weight.shape[-1]
+        # flip_weight = self._rot90(self._rot90(self.weight))
+        # dilated_output = self._dilate(gradwrtoutput, dilation=self.stride)
+        
+        # dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(H-1,W-1))
+        # return dx
     
     def param(self):
         return [(self.weight, self.weight.grad), (self.bias, self.bias.grad)]
@@ -91,7 +89,7 @@ class Conv2d(Module):
         
         unfolded = unfold(input, kernel_size=K, dilation=D, padding=P, stride=S)
         if bias is None:
-            kxb = weight.view(out_channels, -1).matmul(unfolded)
+            kxb = weight.reshape(out_channels, -1).matmul(unfolded)
         else:
             kxb = weight.view(out_channels, -1).matmul(unfolded) + bias.view(1, -1, 1)
         output = kxb.view(N, out_channels , int((H+2*P[0]-D[0]*(K[0]-1)-1)/S[0] + 1) , int((W+2*P[1]-D[1]*(K[1]-1)-1)/S[1] + 1))
@@ -198,8 +196,6 @@ class ReLU(Module):
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the module's input
-        print(gradwrtoutput.shape)
-        print(self.input.shape)
         return gradwrtoutput.mul(self._dReLU(self.input))
     
     def _dReLU(self, input):

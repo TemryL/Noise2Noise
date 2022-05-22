@@ -7,31 +7,25 @@ import torch.optim as optim
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 4, kernel_size=3, stride=(3,3), padding=(2,3), dilation=(2,4))
-        self.conv2 = nn.Conv2d(4, 3, kernel_size=3, stride=(2,2), padding=(2,3), dilation=(2,4))
+        self.conv1 = nn.Conv2d(3, 4, kernel_size=3, stride=1, padding=0, dilation=1)
+        self.conv2 = nn.Conv2d(4, 3, kernel_size=3, stride=1, padding=0, dilation=1)
     
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        x = F.sigmoid(self.conv2(x))
+        x = F.relu(self.conv2(x))
         return x
 
 if __name__ == "__main__":
     
-    in_channels = 3
-    out_channels = 4
-    kernel_size = (3,3)
-    stride = (3,3)
-    padd = (2, 3)
-    dil = (2,4)
-    batch_size = 1
+    batch_size = 2
     
-    input = torch.randn((batch_size, in_channels, 32, 32))
-    target = torch.randn((batch_size, 3, 6, 4))
+    input = torch.randn((batch_size, 3, 32, 32))
+    target = torch.randn((batch_size, 3, 28, 28))
     
     net = Net()
     
-    conv1 = Conv2d(3, 4, kernel_size=3, stride=(3,3), padding=(2,3), dilation=(2,4))
-    conv2 = Conv2d(4, 3, kernel_size=3, stride=(2,2), padding=(2,3), dilation=(2,4))
+    conv1 = Conv2d(3, 4, kernel_size=3, stride=1, padding=0, dilation=1)
+    conv2 = Conv2d(4, 3, kernel_size=3, stride=1, padding=0, dilation=1)
     
     conv1.weight = net.conv1.weight.data.mul(1.0)
     conv1.weight.grad = conv1.weight.mul(0.0)
@@ -42,11 +36,11 @@ if __name__ == "__main__":
     conv2.bias = net.conv2.bias.data.mul(1.0)
     conv2.bias.grad = conv2.bias.mul(0.0)
     
-    seq = Sequential(conv1, ReLU(), conv2, Sigmoid())
+    seq = Sequential(conv1, ReLU(), conv2, ReLU())
     ################################################
     
     criterion = nn.MSELoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.1)
+    optimizer = optim.SGD(net.parameters(), lr=1)
     
     # zero the parameter gradients
     optimizer.zero_grad()
@@ -57,13 +51,13 @@ if __name__ == "__main__":
     loss.backward()
     optimizer.step()
     
-    expected = net.conv1.bias.data
+    expected = net.conv2.bias.data
     
     ###############################################
     
     torch.set_grad_enabled(False)
     criterion = MSE()
-    optimizer = SGD(seq.param(), lr=0.1)
+    optimizer = SGD(seq.param(), lr=1)
     
     # zero the parameter gradients
     optimizer.zero_grad()
@@ -74,7 +68,7 @@ if __name__ == "__main__":
     seq.backward(criterion.backward())
     optimizer.step()
     
-    actual = seq.modules[0].bias
+    actual = seq.modules[2].bias
     ###############################################
     
     # in2 = seq(input)
