@@ -20,12 +20,13 @@ if __name__ == '__main__':
     #device = model.device
     
     # Load training set:
-    noisy_imgs_1 , noisy_imgs_2 = torch.load('../Data/train_data.pkl')
+    noisy_imgs_1 , noisy_imgs_2 = torch.load('../../Data/train_data.pkl')
     noisy_imgs_1 = noisy_imgs_1.float()
     noisy_imgs_2 = noisy_imgs_2.float()
     # noisy_imgs_1 = noisy_imgs_1.to(device)
     # noisy_imgs_2 = noisy_imgs_2.to(device)
     
+    print(noisy_imgs_1.shape)
     # Load validation set:
     noisy_imgs, clean_imgs = torch.load('../Data/val_data.pkl')
     noisy_imgs = noisy_imgs.float()

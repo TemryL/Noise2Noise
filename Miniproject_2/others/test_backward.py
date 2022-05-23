@@ -7,15 +7,19 @@ import torch.optim as optim
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 4, kernel_size=3, stride=2, padding=0, dilation=1)
-        self.conv2 = nn.Conv2d(4, 3, kernel_size=3, stride=2, padding=0, dilation=1)
+        self.conv1 = nn.Conv2d(3, 3, kernel_size=4, stride=2)  
+        self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2)
+        self.tconv1 = nn.ConvTranspose2d(3, 3, kernel_size=3, stride=2)
+        self.tconv2 = nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2)
         
-        self.optimizer = torch.optim.SGD(self.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.SGD(self.parameters(), lr=1)
         self.criterion = torch.nn.MSELoss()
     
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        x = F.sigmoid(self.conv2(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.tconv1(x))
+        x = F.relu(self.tconv2(x))
         return x
     
     def train(self, train_input, train_target, num_epochs):
@@ -37,37 +41,19 @@ class Net(nn.Module):
 
 if __name__ == "__main__":
     
-    batch_size = 20
     
-    input = torch.randn((batch_size, 3, 32, 32)).mul(255.0)
-    target = torch.randn((batch_size, 3, 7, 7)).mul(255.0)
+    input = torch.randn((1000, 3, 32, 32)).mul(255.0)
+    target = torch.randn((1000, 3, 32, 32)).mul(255.0)
     
     net = Net()
     mymodel = Model()
     
-    net.conv1.weight.data = mymodel.model.modules[0].weight.mul(1.0) 
-    net.conv1.bias.data = mymodel.model.modules[0].bias.mul(1.0) 
-    
-    actual = mymodel.model.modules[0].weight
-    expected = net.conv1.weight.data
-    
-    print(actual.data_ptr() == expected.data_ptr()) 
-    torch.testing.assert_allclose(expected, actual)
-    
-    # x = net(input)
-    # y = mymodel(input)
-    
-    # torch.testing.assert_allclose(x, y)
-    
     ############# Test Training #############
-    print("-------------- Train Net --------------")
-    net.train(input, target, 50)
+    # print("-------------- Train Net --------------")
+    # net.train(input, target, 50)
     
     print("\n-------------- Train Model --------------")
-    mymodel.train(input, target, 50)
+    mymodel.train(input, target, 10)
     
-    print(actual.data_ptr() == expected.data_ptr()) 
-    torch.testing.assert_allclose(expected, actual)
-    #########################################
     
     

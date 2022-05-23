@@ -1,7 +1,7 @@
-from gzip import _PaddedFile
-from turtle import forward
+from cv2 import dilate
 from torch import empty, cat, arange
 from torch.nn.functional import fold, unfold
+import torch
 
 class Module(object):
     def __init__(self):
@@ -62,17 +62,18 @@ class Conv2d(Module):
         for b in range(self.input.shape[0]):
             permuted = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
             permuted = self._dilate(permuted, self.stride)
-            permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
-            permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
+            # permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
+            # permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
             
             for i in range(self.input.shape[1]):
-                # Problem with stride
                 dw[:,i:i+1,:,:] += self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3)
         
+        dw[dw.isnan()] = 0.0
         self.weight.grad += dw
         
         # Gradient of the loss wrt the bias
         db = gradwrtoutput.sum((0,2,3))
+        db[db.isnan()] = 0.0
         self.bias.grad += db
         
         # Gradient of the loss wrt the module's input
@@ -82,6 +83,7 @@ class Conv2d(Module):
         dilated_output = self._dilate(gradwrtoutput, dilation=self.stride)
         
         dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(K[0]-1, K[1]-1))
+        dx[dx.isnan()] = 0.0
         return dx
     
     def param(self):
@@ -171,24 +173,30 @@ class TransposeConv2d(Conv2d):
         dilated = self._dilate(input, dilation=self.stride)
         K = self.kernel_size
         P = self.padding
-        return self._convolve(dilated, self.out_channels, self._rot90(self._rot90(self.weight)), self.bias, stride=1, padding=(K[0]-P[0]-1, K[1]-P[1]-1), dilation=self.dilation)
+        return self._convolve(dilated, self.out_channels, self.weight, self.bias, stride=1, padding=(K[0]-P[0]-1, K[1]-P[1]-1), dilation=self.dilation)
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the weights
         dw = empty(self.weight.shape).mul(0.0)
-        K = self.kernel_size
+        
         for b in range(self.input.shape[0]):
-            for i in range(self.input.shape[1]):
-                # Problem with stride
-                dw += self._convolve(self.input[b:b+1,:,:,:].permute(1,0,2,3), self.out_channels, gradwrtoutput[b:b+1,:,:,:], padding=(K[0]-1, K[1]-1), stride=self.stride)
+            permuted = self.input[b:b+1,:,:,:].permute(1,0,2,3)
+            dilated = self._dilate(permuted, self.stride)
+            
+            for i in range(gradwrtoutput.shape[1]):
+                dw[:,i:i+1,:,:] += self._convolve(gradwrtoutput[b:b+1,i:i+1,:,:], self.in_channels, dilated, padding=self.padding, stride=1).permute(1,0,2,3)
+                
+        dw[dw.isnan()] = 0.0
         self.weight.grad += dw
         
         # Gradient of the loss wrt the bias
         db = gradwrtoutput.sum((0,2,3))
+        db[db.isnan()] = 0.0
         self.bias.grad += db
         
         # Gradient of the loss wrt the module's input
         dx = self._convolve(gradwrtoutput, self.in_channels, self.weight.permute(1,0,2,3), stride=self.stride, dilation=self.dilation, padding=self.padding)
+        dx[dx.isnan()] = 0.0
         return dx
 
 # class NearestUpsampling(Module):
@@ -209,9 +217,7 @@ class ReLU(Module):
         return gradwrtoutput.mul(self._dReLU(self.input))
     
     def _dReLU(self, input):
-        output = empty(input.shape)
-        output[input>0] = 1.0
-        output[input<=0] = 0.0
+        output = (input > 0).float()
         return output
 
 class Sigmoid(Module):
@@ -269,11 +275,16 @@ class Sequential(Module):
     def forward(self, input):
         for module in self.modules:
             input = module(input)
+            input[input.isnan()] = 0.0
         return input
     
     def backward(self, gradwrtoutput):
         for module in reversed(self.modules):
+            gradwrtoutput[gradwrtoutput.isnan()] = 0.0
             gradwrtoutput = module.backward(gradwrtoutput)
+            gradwrtoutput[gradwrtoutput.isnan()] = 0.0
+            # if torch.isnan(gradwrtoutput).any():
+            #     raise ValueError("{} return nan value".format(module.__repr__()))
         return gradwrtoutput
     
     def param(self):
@@ -291,21 +302,16 @@ class Sequential(Module):
 class Model(Module):
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
-        # self.model = Sequential(Conv2d(3, 3, kernel_size=3, stride=1), 
-        #                         ReLU(),
-        #                         Conv2d(3, 3, kernel_size=3, stride=1),
-        #                         ReLU(),
-        #                         TransposeConv2d(3, 3, kernel_size=3, stride=1),
-        #                         ReLU(),
-        #                         TransposeConv2d(3, 3, kernel_size=3, stride=1),
-        #                         Sigmoid())
-        
-        self.model = Sequential(Conv2d(3, 4, kernel_size=3, stride=2),
-                                ReLU(), 
-                                Conv2d(4, 3, kernel_size=3, stride=2),
+        self.model = Sequential(Conv2d(3, 3, kernel_size=4, stride=2), 
+                                ReLU(),
+                                Conv2d(3, 3, kernel_size=3, stride=2),
+                                ReLU(),
+                                TransposeConv2d(3, 3, kernel_size=3, stride=2),
+                                ReLU(),
+                                TransposeConv2d(3, 3, kernel_size=4, stride=2),
                                 ReLU())
         
-        self.optimizer = SGD(self.model.param(), lr=1e-3)
+        self.optimizer = SGD(self.model.param(), lr=1)
         self.criterion = MSE()
     
     def load_pretrained_model(self):
@@ -321,7 +327,7 @@ class Model(Module):
         train_input = train_input.div(255.0)
         train_target = train_target.div(255.0)
         
-        mini_batch_size = 2
+        mini_batch_size = 10
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
