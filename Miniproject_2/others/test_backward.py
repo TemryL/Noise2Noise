@@ -50,7 +50,7 @@ if __name__ == "__main__":
     
     ############# Test Training #############
     # print("-------------- Train Net --------------")
-    # net.train(input, target, 50)
+    # net.train(input, target, 10)
     
     print("\n-------------- Train Model --------------")
     mymodel.train(input, target, 10)

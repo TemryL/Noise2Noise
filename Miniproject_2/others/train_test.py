@@ -17,25 +17,21 @@ def pixel_normalization(input):
 
 if __name__ == '__main__':
     model = Model()
-    #device = model.device
     
     # Load training set:
     noisy_imgs_1 , noisy_imgs_2 = torch.load('../../Data/train_data.pkl')
     noisy_imgs_1 = noisy_imgs_1.float()
     noisy_imgs_2 = noisy_imgs_2.float()
-    # noisy_imgs_1 = noisy_imgs_1.to(device)
-    # noisy_imgs_2 = noisy_imgs_2.to(device)
     
-    print(noisy_imgs_1.shape)
     # Load validation set:
-    noisy_imgs, clean_imgs = torch.load('../Data/val_data.pkl')
+    noisy_imgs, clean_imgs = torch.load('../../Data/val_data.pkl')
     noisy_imgs = noisy_imgs.float()
     clean_imgs = clean_imgs.float()
     
     # Training:
     train = True
     if train:
-        model.train(noisy_imgs_1.narrow(0, 0, 10), noisy_imgs_2.narrow(0, 0, 10), 2)
+        model.train(noisy_imgs_1.narrow(0, 0, 992), noisy_imgs_2.narrow(0, 0, 992), 10)
         #torch.save(model.state_dict(), 'bestmodel.pth')
     
     # Validation:

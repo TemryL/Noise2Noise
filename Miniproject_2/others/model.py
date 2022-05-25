@@ -1,7 +1,5 @@
-from cv2 import dilate
 from torch import empty, cat, arange
 from torch.nn.functional import fold, unfold
-import torch
 
 class Module(object):
     def __init__(self):
@@ -42,22 +40,26 @@ class Conv2d(Module):
         self.dilation = self._check_argument(dilation, "dilation")
         
         self.weight = empty(out_channels, in_channels, *self.kernel_size).uniform_(-1,1)
-        self.weight.grad = empty(out_channels, in_channels, *self.kernel_size).mul(0.0)
+        self.weight.grad = empty(out_channels, in_channels, *self.kernel_size).zero_()
         
         if bias is True:
             self.bias = empty(out_channels).uniform_(-1,1)
-            self.bias.grad = empty(out_channels).mul(0.0)
+            self.bias.grad = empty(out_channels).zero_()
         
         self.input = None
     
     def forward(self, input):
         # input : tensor of size (N, C, H, W) 
         self.input = input
+        test = self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
+        if test.isnan().any():
+            print(self.weight.grad)
+            raise ValueError("oooo")
         return self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the weights
-        dw = empty(self.weight.shape).mul(0.0)
+        dw = empty(self.weight.shape).zero_()
         
         for b in range(self.input.shape[0]):
             permuted = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
@@ -66,15 +68,23 @@ class Conv2d(Module):
             # permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
             
             for i in range(self.input.shape[1]):
-                dw[:,i:i+1,:,:] += self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3)
+                if self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3).isnan().any():
+                    raise ValueError("problem")
+                dw[:,i:i+1,:,:].add_(self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
         
-        dw[dw.isnan()] = 0.0
-        self.weight.grad += dw
+        #dw[dw.isnan()] = 0.0
+        if dw.isnan().any():
+            raise ValueError("c ici")
+        test = self.weight.grad.mul(1.0)
+        self.weight.grad.add_(dw)
+        if self.weight.grad.isnan().any():
+            print(test)
+            raise ValueError("dwdwdw")
         
         # Gradient of the loss wrt the bias
         db = gradwrtoutput.sum((0,2,3))
-        db[db.isnan()] = 0.0
-        self.bias.grad += db
+        #db[db.isnan()] = 0.0
+        self.bias.grad.add_(db)
         
         # Gradient of the loss wrt the module's input
         K = self.weight.shape[-2], self.weight.shape[-1]
@@ -83,11 +93,11 @@ class Conv2d(Module):
         dilated_output = self._dilate(gradwrtoutput, dilation=self.stride)
         
         dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(K[0]-1, K[1]-1))
-        dx[dx.isnan()] = 0.0
+        #dx[dx.isnan()] = 0.0
         return dx
     
     def param(self):
-        return [(self.weight, self.weight.grad), (self.bias, self.bias.grad)]
+        return [[self.weight, self.weight.grad], [self.bias, self.bias.grad]]
     
     def _convolve(self, input, out_channels, weight, bias=None, stride=1, dilation=1, padding=0):
         N, C, H, W = list(input.shape)
@@ -112,25 +122,25 @@ class Conv2d(Module):
         return padded
     
     def _padd_top(self, input, padd_top):
-        if padd_top<=0:
+        if padd_top <= 0:
             return input
         N, C, H, W = list(input.shape)
-        padded = empty(N ,C, H+padd_top, W).mul(0.0)
+        padded = empty(N ,C, H+padd_top, W).zero_()
         padded[:,:,padd_top:,:] = input
         return padded
     
     def _padd_right(self, input, padd_right):
-        if padd_right<=0:
+        if padd_right <= 0:
             return input
         N, C, H, W = list(input.shape)
-        padded = empty(N ,C, H, W+padd_right).mul(0.0)
+        padded = empty(N ,C, H, W+padd_right).zero_()
         padded[:,:,:,:-padd_right] = input
         return padded
     
     def _dilate(self, input, dilation):
         N, C, H, W = list(input.shape)
         D = self._check_argument(dilation)
-        dilated = empty(N ,C, H + (H-1)*(D[0]-1), W + (W-1)*(D[1]-1)).mul(0.0)
+        dilated = empty(N ,C, H + (H-1)*(D[0]-1), W + (W-1)*(D[1]-1)).zero_()
         dilated[:,:,::D[0],::D[1]] = input
         return dilated
     
@@ -165,7 +175,7 @@ class TransposeConv2d(Conv2d):
     def __init__(self, in_channels: int, out_channels: int, kernel_size, stride=1, padding=0, dilation=1, bias=True):
         super().__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, bias)
         self.weight = empty(in_channels, out_channels, *self.kernel_size).uniform_(-1,1)
-        self.weight.grad = empty(in_channels, out_channels, *self.kernel_size).mul(0.0)
+        self.weight.grad = empty(in_channels, out_channels, *self.kernel_size).zero_()
     
     def forward(self, input):
         # input : tensor of size (N, C, H, W) 
@@ -173,30 +183,34 @@ class TransposeConv2d(Conv2d):
         dilated = self._dilate(input, dilation=self.stride)
         K = self.kernel_size
         P = self.padding
-        return self._convolve(dilated, self.out_channels, self.weight, self.bias, stride=1, padding=(K[0]-P[0]-1, K[1]-P[1]-1), dilation=self.dilation)
+        test = self._convolve(dilated, self.out_channels, self.weight, self.bias, stride=1, padding=(K[0]-P[0]-1, K[1]-P[1]-1), dilation=self.dilation)
+        if test.isnan().any():
+            print(self.weight)
+            raise ValueError("ttttt")
+        return test
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the weights
-        dw = empty(self.weight.shape).mul(0.0)
+        dw = empty(self.weight.shape).zero_()
         
         for b in range(self.input.shape[0]):
             permuted = self.input[b:b+1,:,:,:].permute(1,0,2,3)
             dilated = self._dilate(permuted, self.stride)
             
             for i in range(gradwrtoutput.shape[1]):
-                dw[:,i:i+1,:,:] += self._convolve(gradwrtoutput[b:b+1,i:i+1,:,:], self.in_channels, dilated, padding=self.padding, stride=1).permute(1,0,2,3)
+                dw[:,i:i+1,:,:].add_(self._convolve(gradwrtoutput[b:b+1,i:i+1,:,:], self.in_channels, dilated, padding=self.padding, stride=1).permute(1,0,2,3))
                 
-        dw[dw.isnan()] = 0.0
-        self.weight.grad += dw
+        #dw[dw.isnan()] = 0.0
+        self.weight.grad.add_(dw)
         
         # Gradient of the loss wrt the bias
         db = gradwrtoutput.sum((0,2,3))
-        db[db.isnan()] = 0.0
-        self.bias.grad += db
+        #db[db.isnan()] = 0.0
+        self.bias.grad.add_(db)
         
         # Gradient of the loss wrt the module's input
         dx = self._convolve(gradwrtoutput, self.in_channels, self.weight.permute(1,0,2,3), stride=self.stride, dilation=self.dilation, padding=self.padding)
-        dx[dx.isnan()] = 0.0
+        #dx[dx.isnan()] = 0.0
         return dx
 
 # class NearestUpsampling(Module):
@@ -234,7 +248,7 @@ class Sigmoid(Module):
         return self._dSigmoid(self.input).mul(gradwrtoutput)
     
     def _dSigmoid(self, input):
-        return input*(1.0-input)
+        return input.mul(1-input)
 
 class MSE(Module):
     def __init__(self):
@@ -253,17 +267,21 @@ class MSE(Module):
 
 class SGD(object):
     def __init__(self, parameters, lr):
-        # parameters: list of pairs (2-tuple) of parameters returned by param() function from class Module
+        # parameters: list of pairs (2-list) of parameters returned by param() function from class Module
         self.params = parameters
         self.lr = lr
     
     def zero_grad(self):
         for param in self.params:
-            param[1].mul_(0.0)
+            if param[1].isnan().any():
+                raise ValueError("sgdsgsdg")
+            param[1].zero_()
+            if param[1].isnan().any():
+                raise ValueError("bjbejb")
     
     def step(self):
         for param in self.params:
-            param[0].add_(param[1].mul(-self.lr))
+            param[0].sub_(param[1].mul(self.lr))
 
 class Sequential(Module):
     def __init__(self, *args):
@@ -273,17 +291,21 @@ class Sequential(Module):
             self.modules.append(module)
     
     def forward(self, input):
+        i = 0
         for module in self.modules:
             input = module(input)
-            input[input.isnan()] = 0.0
+            #input[input.isnan()] = 0.0
+            if input.isnan().any():
+                raise ValueError("{} return nan value during forward at layer {}".format(module.__repr__(), i))
+            i += 1
         return input
     
     def backward(self, gradwrtoutput):
         for module in reversed(self.modules):
-            gradwrtoutput[gradwrtoutput.isnan()] = 0.0
+            #gradwrtoutput[gradwrtoutput.isnan()] = 0.0
             gradwrtoutput = module.backward(gradwrtoutput)
-            gradwrtoutput[gradwrtoutput.isnan()] = 0.0
-            # if torch.isnan(gradwrtoutput).any():
+            #gradwrtoutput[gradwrtoutput.isnan()] = 0.0
+            # if gradwrtoutput.isnan().any():
             #     raise ValueError("{} return nan value".format(module.__repr__()))
         return gradwrtoutput
     
@@ -309,9 +331,9 @@ class Model(Module):
                                 TransposeConv2d(3, 3, kernel_size=3, stride=2),
                                 ReLU(),
                                 TransposeConv2d(3, 3, kernel_size=4, stride=2),
-                                ReLU())
+                                Sigmoid())
         
-        self.optimizer = SGD(self.model.param(), lr=1)
+        self.optimizer = SGD(self.model.param(), lr=1e-3)
         self.criterion = MSE()
     
     def load_pretrained_model(self):
@@ -327,7 +349,7 @@ class Model(Module):
         train_input = train_input.div(255.0)
         train_target = train_target.div(255.0)
         
-        mini_batch_size = 10
+        mini_batch_size = 32
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
