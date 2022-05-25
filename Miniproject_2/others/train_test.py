@@ -29,14 +29,14 @@ if __name__ == '__main__':
     clean_imgs = clean_imgs.float()
     
     # Training:
-    train = True
+    train = False
     if train:
         model.train(noisy_imgs_1.narrow(0, 0, 992), noisy_imgs_2.narrow(0, 0, 992), 10)
-        #torch.save(model.state_dict(), 'bestmodel.pth')
+        torch.save(model.param(), 'bestmodel.pth')
     
     # Validation:
     # model = model.to('cpu')
-    # model.load_pretrained_model()
+    model.load_pretrained_model()
     
     psn_ratio = 0
     count = 1

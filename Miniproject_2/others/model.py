@@ -1,5 +1,6 @@
-from torch import empty, cat, arange
+from torch import empty, cat, arange, load
 from torch.nn.functional import fold, unfold
+from pathlib import Path
 
 class Module(object):
     def __init__(self):
@@ -333,12 +334,17 @@ class Model(Module):
                                 TransposeConv2d(3, 3, kernel_size=4, stride=2),
                                 Sigmoid())
         
-        self.optimizer = SGD(self.model.param(), lr=1e-3)
+        self.parameters = self.model.param()
+        self.optimizer = SGD(self.parameters, lr=1e-3)
         self.criterion = MSE()
     
     def load_pretrained_model(self):
-        ## This loads the parameters saved in bestmodel .pth into the model
-        pass
+        # This loads the parameters saved in bestmodel .pth into the model
+        model_path = Path(__file__).parent/"bestmodel.pth"
+        parameters = load(model_path)
+        for actual, saved in zip(self.parameters, parameters):
+            actual[0].copy_(saved[0])
+            actual[1].copy_(saved[1])
     
     def train(self, train_input, train_target, num_epochs):
         # train_input : tensor of size (N, C, H, W) containing a noisy version of the images with values in range 0-255.
@@ -360,14 +366,14 @@ class Model(Module):
                 self.backward(self.criterion.backward())
                 self.optimizer.step()
             print("Epoch {}: Loss {}".format(e, epoch_loss))
-        
+    
     def predict(self, test_input):
         # test_input : tensor of size (N1 , C, H, W) with values in range 0-255 that has to be denoised by the trained
         # or the loaded network .
         # returns a tensor of the size (N1 , C, H, W) with values in range 0-255.
         
         test_input = test_input.div(255.0)
-        test_output = self.model(test_input).mul(255.0)
+        test_output = self(test_input).mul(255.0)
         return test_output
     
     def forward(self, input):
@@ -377,7 +383,7 @@ class Model(Module):
         return self.model.backward(gradwrtoutput)
     
     def param(self):
-        return self.model.param()
+        return self.parameters
     
     def __repr__(self):
         name = self.model.__repr__().replace("Sequential", self.__class__.__name__)
