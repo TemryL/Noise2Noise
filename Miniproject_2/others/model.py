@@ -1,7 +1,7 @@
-from torch import empty, cat, arange, load
+from torch import Value, empty, cat, arange, load
 from torch.nn.functional import fold, unfold
 from pathlib import Path
-
+import torch
 class Module(object):
     def __init__(self):
         pass
@@ -53,10 +53,13 @@ class Conv2d(Module):
         # input : tensor of size (N, C, H, W) 
         self.input = input
         test = self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
-        if test.isnan().any():
-            print(self.weight.grad)
-            raise ValueError("oooo")
+        expected = torch.nn.functional.conv2d(input, self.weight, self.bias, self.stride, self.padding, self.dilation) 
+        # torch.testing.assert_allclose(expected, test)
+        # if test.isinf().any():
+        #     print(input)
+        #     raise ValueError("conv return inf")
         return self._convolve(input, self.out_channels, self.weight, self.bias, self.stride, self.dilation, self.padding)
+        
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the weights
@@ -65,13 +68,28 @@ class Conv2d(Module):
         for b in range(self.input.shape[0]):
             permuted = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
             permuted = self._dilate(permuted, self.stride)
-            # permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
-            # permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
+            permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
+            permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
             
             for i in range(self.input.shape[1]):
                 if self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3).isnan().any():
                     raise ValueError("problem")
                 dw[:,i:i+1,:,:].add_(self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
+
+        ######################################
+        # permuted = gradwrtoutput.permute(1,0,2,3)
+        # permuted = self._dilate(permuted, self.stride)
+        # permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
+        # permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
+        
+        # print(self.input.shape)
+        # print(permuted.shape)
+        # for i in range(self.input.shape[1]):
+        #     if self._convolve(self.input[:,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3).isnan().any():
+        #         raise ValueError("problem")
+        #     dw[:,i:i+1,:,:].add_(self._convolve(self.input[:,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
+        # print(dw.shape)
+        #######################################
         
         #dw[dw.isnan()] = 0.0
         if dw.isnan().any():
@@ -93,7 +111,7 @@ class Conv2d(Module):
         flip_weight = self._rot90(self._rot90(self.weight))
         dilated_output = self._dilate(gradwrtoutput, dilation=self.stride)
         
-        dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(K[0]-1, K[1]-1))
+        dx =  self._convolve(dilated_output, self.in_channels, flip_weight, padding=(K[0]-P[0]-1, K[1]-P[1]-1))
         #dx[dx.isnan()] = 0.0
         return dx
     
@@ -214,9 +232,25 @@ class TransposeConv2d(Conv2d):
         #dx[dx.isnan()] = 0.0
         return dx
 
-# class NearestUpsampling(Module):
-#     def __init__(self):
-#         super().__init__()
+class NearestUpsampling(Module):
+    def __init__(self, scale_factor):
+        super().__init__()
+        self.scale_factor = scale_factor
+    
+    def forward(self, input):
+        # Input: tensor of size N, C, H, W
+        # Output: tensor of size N, C, scale_factor x H, scale_factor x W
+        return input.repeat_interleave(self.scale_factor,-1).repeat_interleave(self.scale_factor,-2) 
+    
+    def backward(self, gradwrtoutput):
+        N, C, H, W = list(gradwrtoutput.shape)
+        scale = self.scale_factor
+        unfolded = unfold(gradwrtoutput, kernel_size=scale, stride=scale)
+        weight = empty(C, C, scale, scale).zero_().add(1.0).div(scale*scale)
+        kxb = weight.reshape(C, -1).matmul(unfolded)
+        output = kxb.reshape(N, C , int((H-scale)/scale + 1) , int((W-scale)/scale + 1))
+        return output
+    
 
 class ReLU(Module):
     def __init__(self):
@@ -242,11 +276,25 @@ class Sigmoid(Module):
     
     def forward(self, input):
         self.input = input
+        # expected = torch.sigmoid(input)
+        # test = input.mul(-1.0).exp().add(1.0).pow(-1.0)
+        # torch.testing.assert_allclose(expected, test)
         return input.mul(-1.0).exp().add(1.0).pow(-1.0)
+        #return 1/(1+(-self.input).exp())
     
     def backward(self, gradwrtoutput):
         # Gradient of the loss wrt the module's input
-        return self._dSigmoid(self.input).mul(gradwrtoutput)
+        # if gradwrtoutput.isnan().any():
+        #     print(gradwrtoutput)
+        #     raise ValueError("grad")
+        # if self._dSigmoid(self.input).mul(gradwrtoutput).isnan().any():
+        #     print(self.input)
+        #     print(gradwrtoutput)
+        #     raise ValueError("grad apres")
+        
+        # return self._dSigmoid(self.input).mul(gradwrtoutput)
+        y = (-self.input).exp().div((1+(-self.input).exp())**2)
+        return y.mul(gradwrtoutput)
     
     def _dSigmoid(self, input):
         return input.mul(1-input)
@@ -325,14 +373,30 @@ class Sequential(Module):
 class Model(Module):
     def __init__(self):
         ## instantiate model + optimizer + loss function + any other stuff you need
-        self.model = Sequential(Conv2d(3, 3, kernel_size=4, stride=2), 
+        # self.model = Sequential(Conv2d(3, 3, kernel_size=4, stride=2), 
+        #                         ReLU(),
+        #                         Conv2d(3, 3, kernel_size=3, stride=2),
+        #                         ReLU(),
+        #                         TransposeConv2d(3, 3, kernel_size=3, stride=2),
+        #                         ReLU(),
+        #                         TransposeConv2d(3, 3, kernel_size=4, stride=2),
+        #                         Sigmoid())
+        
+        self.model = Sequential(Conv2d(3, 3, kernel_size=3, stride=2), 
                                 ReLU(),
                                 Conv2d(3, 3, kernel_size=3, stride=2),
                                 ReLU(),
-                                TransposeConv2d(3, 3, kernel_size=3, stride=2),
+                                NearestUpsampling(scale_factor=2),
+                                Conv2d(3, 3, kernel_size=3, stride=1, padding=2),
                                 ReLU(),
-                                TransposeConv2d(3, 3, kernel_size=4, stride=2),
+                                NearestUpsampling(scale_factor=2),
+                                Conv2d(3, 3, kernel_size=3, stride=1, padding=1),
                                 Sigmoid())
+        
+        # self.model = Sequential(Conv2d(3, 3, kernel_size=3, stride=2), 
+        #                         ReLU(),
+        #                         Conv2d(3, 3, kernel_size=3, stride=2),
+        #                         Sigmoid())
         
         self.parameters = self.model.param()
         self.optimizer = SGD(self.parameters, lr=1e-3)
