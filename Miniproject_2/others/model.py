@@ -65,31 +65,37 @@ class Conv2d(Module):
         # Gradient of the loss wrt the weights
         dw = empty(self.weight.shape).zero_()
         
-        for b in range(self.input.shape[0]):
-            permuted = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
-            permuted = self._dilate(permuted, self.stride)
-            permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
-            permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
+        # for b in range(self.input.shape[0]):
+        #     permuted = gradwrtoutput[b:b+1,:,:,:].permute(1,0,2,3)
+        #     permuted = self._dilate(permuted, self.stride)
+        #     permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
+        #     permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
             
-            for i in range(self.input.shape[1]):
-                if self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3).isnan().any():
-                    raise ValueError("problem")
-                dw[:,i:i+1,:,:].add_(self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
-
+        #     for i in range(self.input.shape[1]):
+        #         if self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3).isnan().any():
+        #             raise ValueError("problem")
+        #         dw[:,i:i+1,:,:].add_(self._convolve(self.input[b:b+1,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
+        
         ######################################
-        # permuted = gradwrtoutput.permute(1,0,2,3)
+        
+        # permuted = gradwrtoutput.sum(0, keepdim=True).permute(1,0,2,3)
         # permuted = self._dilate(permuted, self.stride)
         # permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
         # permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
         
-        # print(self.input.shape)
-        # print(permuted.shape)
         # for i in range(self.input.shape[1]):
         #     if self._convolve(self.input[:,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3).isnan().any():
         #         raise ValueError("problem")
-        #     dw[:,i:i+1,:,:].add_(self._convolve(self.input[:,i:i+1,:,:], self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
-        # print(dw.shape)
+            
+        #     dw[:,i:i+1,:,:].add_(self._convolve(self.input[:,i:i+1,:,:].sum(0, keepdim=True), self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3))
+        
         #######################################
+        
+        permuted = gradwrtoutput.sum(0, keepdim=True).permute(1,0,2,3)
+        permuted = self._dilate(permuted, self.stride)
+        permuted = self._padd_top(permuted, (self.input.shape[-2] - permuted.shape[-2]) % self.stride[0])
+        permuted = self._padd_right(permuted, (self.input.shape[-1] - permuted.shape[-1]) % self.stride[1])
+        dw = self._convolve(self.input.sum(0, keepdim=True).sum(1, keepdim=True), self.out_channels, permuted, padding=self.padding, stride=self.dilation).permute(1,0,2,3)
         
         #dw[dw.isnan()] = 0.0
         if dw.isnan().any():
@@ -419,7 +425,7 @@ class Model(Module):
         train_input = train_input.div(255.0)
         train_target = train_target.div(255.0)
         
-        mini_batch_size = 32
+        mini_batch_size = 50
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
