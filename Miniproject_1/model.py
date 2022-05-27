@@ -5,7 +5,7 @@ from pathlib import Path
 
 class Model(nn.Module):
     def __init__(self):
-        # instantiate model + optimizer + loss function + any other stuff you need
+        # instantiate model + optimizer + loss function 
         super().__init__()
         
         #Encoder
@@ -21,17 +21,17 @@ class Model(nn.Module):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.to(self.device)  
-        
+    
     def forward(self, x):
         res = F.relu(self.conv1(x))
         x = F.relu(self.conv2(res))
         x = F.relu(self.t_conv1(x))
-        x = torch.cat((res, x), dim=1) 
+        x = torch.cat((res, x), dim=1)      # Skip connection
         x = torch.sigmoid(self.t_conv2(x))
         return x
     
     def load_pretrained_model(self):
-        # This loads the parameters saved in bestmodel .pth into the model
+        # This loads the parameters saved in bestmodel.pth into the model
         model_path = Path(__file__).parent/"bestmodel.pth"
         m_state_dict = torch.load(model_path, map_location=torch.device(self.device))
         self.load_state_dict(m_state_dict)
@@ -45,18 +45,19 @@ class Model(nn.Module):
             train_input = train_input.div(255.0)
             train_target = train_target.div(255.0)
             
-            #mini_batch_size = 8
-            mini_batch_size = 1000
+            mini_batch_size = 8
+            
             for e in range(num_epochs):
                 epoch_loss = 0
+                
                 for b in range(0, train_input.size(0), mini_batch_size):
-                    print(b)
                     output = self(train_input.narrow(0, b, mini_batch_size))
                     loss = self.criterion(output, train_target.narrow(0, b, mini_batch_size))
                     epoch_loss += loss.item()
                     self.optimizer.zero_grad()
                     loss.backward()
                     self.optimizer.step()
+                
                 print("Epoch {}: Loss {}".format(e, epoch_loss))
     
     def predict(self, test_input):
