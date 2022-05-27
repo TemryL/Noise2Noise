@@ -10,6 +10,7 @@ import torch
 from torch import nn, optim
 from pathlib import Path
 
+import pickle
 class Net(nn.Module):
     def __init__(self):
         # instantiate model + optimizer + loss function + any other stuff you need
@@ -104,18 +105,19 @@ if __name__ == '__main__':
     clean_imgs = clean_imgs.float()
     
     # Training:
-    train = True
+    train = False
     if train:
         print("-------------- Train Net --------------")
         net.train(noisy_imgs_1.narrow(0, 0, 1000), noisy_imgs_2.narrow(0, 0, 1000), 1)
         
         print("\n-------------- Train Model --------------")
-        model.train(noisy_imgs_1.narrow(0, 0, 1000), noisy_imgs_2.narrow(0, 0, 1000), 5)
-        torch.save(model.param(), 'bestmodel.pth')
+        model.train(noisy_imgs_1.narrow(0, 0, 1000), noisy_imgs_2.narrow(0, 0, 1000), 1)
+        with open('bestmodel.pth', 'wb') as f:
+            pickle.dump(model.param(), f)
     
     # Validation:
     # model = model.to('cpu')
-    #model.load_pretrained_model()
+    model.load_pretrained_model()
     
     psn_ratio = 0
     count = 1
