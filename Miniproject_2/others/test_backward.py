@@ -23,7 +23,7 @@ class Net(nn.Module):
         train_input = train_input.div(255.0)
         train_target = train_target.div(255.0)
         
-        mini_batch_size = 32
+        mini_batch_size = 50
         for e in range(num_epochs):
             epoch_loss = 0
             for b in range(0, train_input.size(0), mini_batch_size):
@@ -38,8 +38,8 @@ class Net(nn.Module):
 if __name__ == "__main__":
     
     
-    input = torch.randn((992, 3, 32, 32)).mul(255.0)
-    target = torch.randn((992, 3, 7, 7)).mul(255.0)
+    input = torch.randn((1000, 3, 32, 32)).mul(255.0)
+    target = torch.randn((1000, 3, 7, 7)).mul(255.0)
     
     net = Net()
     mymodel = Model()

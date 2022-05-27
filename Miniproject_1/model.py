@@ -45,10 +45,12 @@ class Model(nn.Module):
             train_input = train_input.div(255.0)
             train_target = train_target.div(255.0)
             
-            mini_batch_size = 8
+            #mini_batch_size = 8
+            mini_batch_size = 1000
             for e in range(num_epochs):
                 epoch_loss = 0
                 for b in range(0, train_input.size(0), mini_batch_size):
+                    print(b)
                     output = self(train_input.narrow(0, b, mini_batch_size))
                     loss = self.criterion(output, train_target.narrow(0, b, mini_batch_size))
                     epoch_loss += loss.item()

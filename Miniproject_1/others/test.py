@@ -20,21 +20,21 @@ if __name__ == '__main__':
     device = model.device
     
     # Load training set:
-    noisy_imgs_1 , noisy_imgs_2 = torch.load('../Data/train_data.pkl')
+    noisy_imgs_1 , noisy_imgs_2 = torch.load('../../Data/train_data.pkl')
     noisy_imgs_1 = noisy_imgs_1.float()
     noisy_imgs_2 = noisy_imgs_2.float()
     noisy_imgs_1 = noisy_imgs_1.to(device)
     noisy_imgs_2 = noisy_imgs_2.to(device)
     
     # Load validation set:
-    noisy_imgs, clean_imgs = torch.load('../Data/val_data.pkl')
+    noisy_imgs, clean_imgs = torch.load('../../Data/val_data.pkl')
     noisy_imgs = noisy_imgs.float()
     clean_imgs = clean_imgs.float()
     
     # Training:
     train = True
     if train:
-        model.train(noisy_imgs_1.narrow(0, 0, 992), noisy_imgs_2.narrow(0, 0, 992), 10)
+        model.train(noisy_imgs_1.narrow(0, 0, 50000), noisy_imgs_2.narrow(0, 0, 50000), 1)
         torch.save(model.state_dict(), 'bestmodel.pth')
     
     # Validation:
