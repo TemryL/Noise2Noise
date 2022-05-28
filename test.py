@@ -18,7 +18,6 @@ version = sys.version_info[:2]
 if version < (3, 6):
     raise RuntimeError("This script uses f-strings, which requires Python version >= 3.6. Use a newer version of Python.")
 
-# python test.py -d "C:\Users\Tom\Documents\EPFL\COURS\MA2\Deep learning\Projets_DL\Proj_297217\Data" -p "C:\Users\Tom\Documents\EPFL\COURS\MA2\Deep learning\Projets_DL\Proj_297217"
 """
 Note to students:
 
