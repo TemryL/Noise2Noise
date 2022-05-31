@@ -14,4 +14,4 @@ Miniproject_2 consist of implementing the same Network from scratch (without PyT
 
 Here are results of both model trained under same conditions, on 3 random image of the validation set:
 
-![alt text](https://github.com/[Termryl]/[Noise2Noise]/blob/[main]/results.png?raw=true)
+![alt text](https://github.com/[TermryL]/[Noise2Noise]/blob/[main]/results.png?raw=true)
