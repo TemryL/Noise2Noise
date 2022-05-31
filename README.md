@@ -12,6 +12,6 @@ Miniproject_1 consist of implementing a Noise2Noise autoencoder using PyTorch fr
 
 Miniproject_2 consist of implementing the same Network from scratch (without PyTorch framework).
 
-Here are results of both model trained under same conditions, on 3 random image of the validation set:
+Here are results of both model trained under same conditions, on 3 random images of the validation set:
 
 [![IMAGE ALT TEXT HERE](https://github.com/TemryL/Noise2Noise/blob/main/results.png)](https://github.com/TemryL/Noise2Noise/blob/main)
